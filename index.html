@@ -1,0 +1,104 @@
+<html>
+  <head>
+    <title>ice-tcp</title>
+  </head>
+
+  <body>
+    <h1>ICE TCP</h1>
+
+    Enable Trickle: <input type="checkbox">
+    <button onclick="sendRequestOffer()">Pion Offer</button>
+    <button onclick="sendOffer()">Pion Answer</button>
+
+    <h3> ICE Connection States </h3>
+    <div id="iceConnectionStates"></div> <br />
+
+    <h3> Inbound DataChannel Messages </h3>
+    <div id="inboundDataChannelMessages"></div>
+  </body>
+
+  <script>
+    let pc = new RTCPeerConnection()
+    let dc = pc.createDataChannel('data')
+
+    dc.onmessage = event => {
+      let el = document.createElement('p')
+      el.appendChild(document.createTextNode(event.data))
+
+      document.getElementById('inboundDataChannelMessages').appendChild(el);
+    }
+
+    pc.oniceconnectionstatechange = () => {
+      let el = document.createElement('p')
+      el.appendChild(document.createTextNode(pc.iceConnectionState))
+
+      document.getElementById('iceConnectionStates').appendChild(el);
+    }
+
+    let ws = new WebSocket(`ws://${window.location.host}/websocket`)
+    pc.onicecandidate = e => {
+      if (!e.candidate) {
+        return
+      }
+
+      ws.send(JSON.stringify({event: 'candidate', data: JSON.stringify(e.candidate)}))
+    }
+
+    ws.onclose = function(evt) {
+      window.alert("Websocket has closed")
+    }
+
+    ws.onmessage = function(evt) {
+      let msg = JSON.parse(evt.data)
+      if (!msg) {
+        return window.alert('failed to parse msg')
+      }
+
+      switch (msg.event) {
+        case 'answer':
+          let answer = JSON.parse(msg.data)
+          if (!answer) {
+            return window.alert('failed to parse answer')
+          }
+          pc.setRemoteDescription(answer)
+          return
+
+
+        case 'offer':
+          let offer = JSON.parse(msg.data)
+          if (!offer) {
+            return window.alert('failed to parse offer')
+          }
+          pc.setRemoteDescription(offer)
+          pc.createAnswer().then(answer => {
+            pc.setLocalDescription(answer)
+            ws.send(JSON.stringify({event: 'answer', data: JSON.stringify(answer)}))
+          })
+          return
+
+        case 'candidate':
+          let candidate = JSON.parse(msg.data)
+          if (!candidate) {
+            return window.alert('failed to parse candidate')
+          }
+
+          pc.addIceCandidate(candidate)
+      }
+    }
+
+    ws.onerror = function(evt) {
+      window.alert(`Websocket has error ${evt.data}`)
+    }
+
+    window.sendOffer = () => {
+      pc.createOffer().then(offer => {
+        pc.setLocalDescription(offer)
+        ws.send(JSON.stringify({event: 'offer', data: JSON.stringify(offer)}))
+      })
+    }
+
+    window.sendRequestOffer = () => {
+      ws.send(JSON.stringify({event: 'requestOffer', data: ''}))
+    }
+  </script>
+</html>
