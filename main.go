@@ -168,6 +168,13 @@ func main() {
 	tcpMux := webrtc.NewICETCPMux(nil, tcpListener, 8)
 	settingEngine.SetICETCPMux(tcpMux)
 
+	settingEngine.SetNetworkTypes([]webrtc.NetworkType{
+		webrtc.NetworkTypeUDP4,
+		webrtc.NetworkTypeUDP6,
+		webrtc.NetworkTypeTCP4,
+		webrtc.NetworkTypeTCP6,
+	})
+
 	if len(os.Args) == 2 {
 		fmt.Printf("Setting Listening IP %s\n", os.Args[1])
 		settingEngine.SetNAT1To1IPs([]string{os.Args[1]}, webrtc.ICECandidateTypeHost)
